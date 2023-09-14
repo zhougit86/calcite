@@ -16,6 +16,10 @@
  */
 package org.apache.calcite.runtime;
 
+import com.google.common.cache.CacheBuilder;
+import com.google.common.cache.CacheLoader;
+import com.google.common.cache.LoadingCache;
+
 import org.apache.calcite.sql.SqlJsonConstructorNullClause;
 import org.apache.calcite.sql.SqlJsonExistsErrorBehavior;
 import org.apache.calcite.sql.SqlJsonQueryEmptyOrErrorBehavior;
@@ -55,6 +59,7 @@ import java.util.Queue;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
+import static org.apache.calcite.config.CalciteSystemProperty.FUNCTION_LEVEL_CACHE_MAX_SIZE;
 import static org.apache.calcite.linq4j.Nullness.castNonNull;
 import static org.apache.calcite.util.Static.RESOURCE;
 
@@ -76,6 +81,10 @@ public class JsonFunctions {
   private static final PrettyPrinter JSON_PRETTY_PRINTER =
       new DefaultPrettyPrinter().withObjectIndenter(
           DefaultIndenter.SYSTEM_LINEFEED_INSTANCE.withLinefeed("\n"));
+  private static final LoadingCache<String, JsonValueContext> cache =
+      CacheBuilder.newBuilder()
+          .maximumSize(FUNCTION_LEVEL_CACHE_MAX_SIZE.value())
+          .build(CacheLoader.from(input -> jsonValueExpression(input)));
 
   private static final String JSON_ROOT_PATH = "$";
 
@@ -117,7 +126,7 @@ public class JsonFunctions {
   }
 
   public static JsonPathContext jsonApiCommonSyntax(String input, String pathSpec) {
-    return jsonApiCommonSyntax(jsonValueExpression(input), pathSpec);
+    return jsonApiCommonSyntax(cache.getUnchecked(input), pathSpec);
   }
 
   public static JsonPathContext jsonApiCommonSyntax(JsonValueContext input, String pathSpec) {
